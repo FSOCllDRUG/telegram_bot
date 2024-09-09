@@ -39,7 +39,7 @@ async def orm_count_users(session: AsyncSession):
 
 
 async def orm_get_last_10_users(session: AsyncSession):
-    query = select(User).order_by(User.id.desc()).limit(2)
+    query = select(User).order_by(User.id.desc()).limit(10)
     result = await session.execute(query)
     return result.scalars().all()
 
@@ -58,3 +58,9 @@ async def orm_mailing_status(session: AsyncSession, user_id: int):
     query = select(User.mailing).where(User.user_id == user_id)
     result = await session.execute(query)
     return result.scalar()
+
+
+async def orm_get_mailing_list(session: AsyncSession):
+    query = select(User.user_id).where(User.mailing == True)
+    result = await session.execute(query)
+    return result.scalars().all()

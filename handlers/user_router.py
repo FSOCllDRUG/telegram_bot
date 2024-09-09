@@ -1,5 +1,5 @@
 from aiogram import Router, F
-from aiogram.filters import CommandStart, CommandObject
+from aiogram.filters import CommandStart
 from aiogram.types import Message, CallbackQuery
 from aiogram.utils.chat_action import ChatActionSender
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,38 +11,18 @@ from db.orm_query import (
     orm_user_get_data,
     orm_mailing_change)
 from keyboards.inline import get_callback_btns, change_mailing_buttons
-from keyboards.reply import get_keyboard
+from keyboards.reply import main_kb
 
 user_router = Router()
 
 
-def main_kb(id):
-    kb = get_keyboard(
-        'Мои данные📝',
-        'Информация о боте🤖',
-        'Информация о разработчике👨‍💻',
-        *(['Админ панель', ] if id in admins else []),
-        placeholder='Что тебя именно интересует?',
-        sizes=(1, 2)
-    )
-    return kb
-
-
 # "/start" handler
 @user_router.message(CommandStart())
-async def cmd_start(message: Message, command: CommandObject, session: AsyncSession):
-    # kb = get_keyboard(
-    #     'Мои данные📝',
-    #     'Информация о боте🤖',
-    #     'Информация о разработчике👨‍💻',
-    #     *(['Админ панель',] if message.from_user.id in admins else []),
-    #     placeholder='Что тебя именно интересует?',
-    #     sizes=(1, 2)
-    # )
+async def cmd_start(message: Message, session: AsyncSession):
     async with ChatActionSender.typing(bot=bot, chat_id=message.from_user.id):
         if await orm_user_get_data(session, user_id=message.from_user.id) is not None:
             await message.answer(f'Снова привет, {message.from_user.full_name}!',
-                                 reply_markup=main_kb(message.from_user.id))
+                                 reply_markup=main_kb(message.from_user.id in admins))
         else:
             await orm_user_start(session, data={
                 'user_id': message.from_user.id,
@@ -50,12 +30,12 @@ async def cmd_start(message: Message, command: CommandObject, session: AsyncSess
                 'name': message.from_user.full_name,
             })
             await message.answer(f'{message.from_user.full_name}, ты добавлен в базу данных.',
-                                 reply_markup=main_kb(message.from_user.id))
+                                 reply_markup=main_kb(message.from_user.id in admins))
 
 
 @user_router.message(F.text == 'Главное меню')
 async def main_menu(message: Message):
-    await message.answer('Ты в главном меню', reply_markup=main_kb(message.from_user.id))
+    await message.answer('Ты в главном меню', reply_markup=main_kb(message.from_user.id in admins))
 
 
 @user_router.message(F.text == 'Мои данные📝')
@@ -107,12 +87,11 @@ async def toggle_mailing_subscription(callback: CallbackQuery, session: AsyncSes
 
 @user_router.message(F.text == 'Информация о боте🤖')
 async def bot_info(message: Message):
-    await message.answer('Тут будет информация о боте', reply_markup=main_kb(message.from_user.id))
+    await message.answer('Тут будет информация о боте')
 
 
 @user_router.message(F.text == 'Информация о разработчике👨‍💻')
 async def developer_info(message: Message):
     await message.answer(f'Контакты:\n'
                          f'Telegram: @xtc_hydra \n'
-                         f'E-mail: vlad.a.borshch@gmail.com\n',
-                         reply_markup=main_kb(message.from_user.id))
+                         f'E-mail: vlad.a.borshch@gmail.com\n')

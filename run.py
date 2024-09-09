@@ -5,7 +5,7 @@ from aiogram.types import BotCommand, BotCommandScopeDefault
 from create_bot import bot, dp, admins
 from db.engine import create_db
 from db.engine import session_maker
-from handlers.admin_panel import admin_router
+from handlers.admin_private import admin_private_router
 from handlers.user_router import user_router
 from middlewares.db import DbSessionMiddleware
 
@@ -36,7 +36,7 @@ async def stop_bot():
 async def main():
     await create_db()
     dp.include_router(user_router)
-    dp.include_router(admin_router)
+    dp.include_router(admin_private_router)
     dp.update.middleware(DbSessionMiddleware(session_pool=session_maker))
 
     dp.startup.register(start_bot)

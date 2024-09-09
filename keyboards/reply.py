@@ -1,33 +1,5 @@
-from aiogram.types import ReplyKeyboardMarkup
-
-from create_bot import admins
-
-
-def main_kb(user_telegram_id: int):
-    kb_list = [[KeyboardButton(text="👤 Мой профиль")]]
-    if user_telegram_id in admins:
-        kb_list.append([KeyboardButton(text="⚙️ Админ панель")])
-    return ReplyKeyboardMarkup(
-        keyboard=kb_list,
-        resize_keyboard=True,
-        one_time_keyboard=True,
-        input_field_placeholder="Воспользуйтесь меню:"
-    )
-
-
-def home_page_kb(user_telegram_id: int):
-    kb_list = [[KeyboardButton(text="🔙 Назад")]]
-    if user_telegram_id in admins:
-        kb_list.append([KeyboardButton(text="⚙️ Админ панель")])
-    return ReplyKeyboardMarkup(
-        keyboard=kb_list,
-        resize_keyboard=True,
-        one_time_keyboard=True,
-        input_field_placeholder="Воспользуйтесь меню:"
-    )
-
-
 from aiogram.types import KeyboardButton
+from aiogram.types import ReplyKeyboardMarkup
 from aiogram.utils.keyboard import ReplyKeyboardBuilder
 
 
@@ -38,7 +10,7 @@ def get_keyboard(
         request_location: int = None,
         sizes: tuple[int] = (2,),
 ):
-    '''
+    """
     Parameters request_contact and request_location must be as indexes of btns args for buttons you need.
     Example:
     get_keyboard(
@@ -51,7 +23,7 @@ def get_keyboard(
             request_contact=4,
             sizes=(2, 2, 1)
         )
-    '''
+    """
     keyboard = ReplyKeyboardBuilder()
 
     for index, text in enumerate(btns, start=0):
@@ -66,3 +38,21 @@ def get_keyboard(
 
     return keyboard.adjust(*sizes).as_markup(
         resize_keyboard=True, input_field_placeholder=placeholder)
+
+
+def main_kb(admin: bool):
+    kb_list = [
+        [KeyboardButton(text="Мои данные📝"),
+         KeyboardButton(text="Информация о боте🤖")],
+        [KeyboardButton(text="Информация о разработчике👨‍💻")],
+    ]
+    if admin:
+        kb_list.append([KeyboardButton(text="Админ панель")])
+    return ReplyKeyboardMarkup(
+        keyboard=kb_list,
+        resize_keyboard=True,
+        one_time_keyboard=False,
+        input_field_placeholder="Воспользуйтесь меню:"
+    )
+
+# def admin_main_kb():
