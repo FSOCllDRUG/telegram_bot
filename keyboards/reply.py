@@ -55,4 +55,3 @@ def main_kb(admin: bool):
         input_field_placeholder="Воспользуйтесь меню:"
     )
 
-# def admin_main_kb():

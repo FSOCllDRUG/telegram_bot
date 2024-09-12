@@ -1,9 +1,9 @@
 from decouple import config
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 
-from db.models import Base
+from db.pg_models import Base
 
-engine = create_async_engine(url=config('DB_URL'))
+engine = create_async_engine(url=config("DB_URL"))
 
 session_maker = async_sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=False)
 

@@ -9,7 +9,7 @@ def get_callback_btns(
     keyboard = InlineKeyboardBuilder()
 
     for text, value in btns.items():
-        if '://' in value:
+        if "://" in value:
             keyboard.add(InlineKeyboardButton(text=text, url=value))
         else:
             keyboard.add(InlineKeyboardButton(text=text, callback_data=value))
@@ -20,11 +20,11 @@ def get_callback_btns(
 def change_mailing_buttons(user_id, mailing_status):
     if mailing_status:
         buttons = {
-            'Отписаться от рассылки': f'change_mailing_{user_id}_0',
+            "Отписаться от рассылки": f"change_mailing_{user_id}_0",
         }
     else:
         buttons = {
-            'Подписаться на рассылку': f'change_mailing_{user_id}_1',
+            "Подписаться на рассылку": f"change_mailing_{user_id}_1",
         }
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text=btn_text, callback_data=callback_data) for btn_text, callback_data in

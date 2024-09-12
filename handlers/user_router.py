@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from create_bot import admins
 from create_bot import bot
-from db.orm_query import (
+from db.pg_orm_query import (
     orm_user_start,
     orm_user_get_data,
     orm_mailing_change)
@@ -21,24 +21,24 @@ user_router = Router()
 async def cmd_start(message: Message, session: AsyncSession):
     async with ChatActionSender.typing(bot=bot, chat_id=message.from_user.id):
         if await orm_user_get_data(session, user_id=message.from_user.id) is not None:
-            await message.answer(f'Снова привет, {message.from_user.full_name}!',
+            await message.answer(f"Снова привет, {message.from_user.full_name}!",
                                  reply_markup=main_kb(message.from_user.id in admins))
         else:
             await orm_user_start(session, data={
-                'user_id': message.from_user.id,
-                'username': message.from_user.username,
-                'name': message.from_user.full_name,
+                "user_id": message.from_user.id,
+                "username": message.from_user.username,
+                "name": message.from_user.full_name,
             })
-            await message.answer(f'{message.from_user.full_name}, ты добавлен в базу данных.',
+            await message.answer(f"{message.from_user.full_name}, ты добавлен в базу данных.",
                                  reply_markup=main_kb(message.from_user.id in admins))
 
 
-@user_router.message(F.text == 'Главное меню')
+@user_router.message(F.text == "Главное меню")
 async def main_menu(message: Message):
-    await message.answer('Ты в главном меню', reply_markup=main_kb(message.from_user.id in admins))
+    await message.answer("Ты в главном меню", reply_markup=main_kb(message.from_user.id in admins))
 
 
-@user_router.message(F.text == 'Мои данные📝')
+@user_router.message(F.text == "Мои данные📝")
 async def user_credentials(message: Message, session: AsyncSession):
     async with ChatActionSender.typing(bot=bot, chat_id=message.from_user.id):
         user = await orm_user_get_data(session, user_id=message.from_user.id)
@@ -59,10 +59,10 @@ async def user_credentials(message: Message, session: AsyncSession):
         await message.answer(reply_text, reply_markup=get_callback_btns(btns=buttons))
 
 
-@user_router.callback_query(F.data.startswith('change_mailing_'))
+@user_router.callback_query(F.data.startswith("change_mailing_"))
 async def toggle_mailing_subscription(callback: CallbackQuery, session: AsyncSession):
-    user_id = int(callback.data.split('_')[-2])
-    sub_status = bool(int(callback.data.split('_')[-1]))
+    user_id = int(callback.data.split("_")[-2])
+    sub_status = bool(int(callback.data.split("_")[-1]))
     new_buttons = change_mailing_buttons(user_id, sub_status)
     await orm_mailing_change(session, user_id=user_id, mailing=sub_status)
 
@@ -77,21 +77,21 @@ async def toggle_mailing_subscription(callback: CallbackQuery, session: AsyncSes
     )
 
     if sub_status:
-        await callback.answer('Вы подписались на рассылку')
+        await callback.answer("Вы подписались на рассылку")
     else:
-        await callback.answer('Вы отписались от рассылки')
+        await callback.answer("Вы отписались от рассылки")
 
     # Edit the message text and reply markup
     await callback.message.edit_text(reply_text, reply_markup=new_buttons)
 
 
-@user_router.message(F.text == 'Информация о боте🤖')
+@user_router.message(F.text == "Информация о боте🤖")
 async def bot_info(message: Message):
-    await message.answer('Тут будет информация о боте')
+    await message.answer("Тут будет информация о боте")
 
 
-@user_router.message(F.text == 'Информация о разработчике👨‍💻')
+@user_router.message(F.text == "Информация о разработчике👨‍💻")
 async def developer_info(message: Message):
-    await message.answer(f'Контакты:\n'
-                         f'Telegram: @xtc_hydra \n'
-                         f'E-mail: vlad.a.borshch@gmail.com\n')
+    await message.answer(f"Контакты:\n"
+                         f"Telegram: @xtc_hydra \n"
+                         f"E-mail: vlad.a.borshch@gmail.com\n")

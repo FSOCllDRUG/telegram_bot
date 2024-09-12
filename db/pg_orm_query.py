@@ -1,14 +1,14 @@
 from sqlalchemy import select, func, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from db.models import User
+from db.pg_models import User
 
 
 async def orm_user_start(session: AsyncSession, data: dict):
     obj = User(
-        user_id=data.get('user_id'),
-        username=data.get('username'),
-        name=data.get('name'),
+        user_id=data.get("user_id"),
+        username=data.get("username"),
+        name=data.get("name"),
     )
     session.add(obj)
     await session.commit()
@@ -64,3 +64,9 @@ async def orm_get_mailing_list(session: AsyncSession):
     query = select(User.user_id).where(User.mailing == True)
     result = await session.execute(query)
     return result.scalars().all()
+
+
+async def orm_mailing_users(session: AsyncSession):
+    query = select(func.count(User.id)).where(User.mailing == True)
+    result = await session.execute(query)
+    return result.scalar()

@@ -3,16 +3,16 @@ import asyncio
 from aiogram.types import BotCommand, BotCommandScopeDefault
 
 from create_bot import bot, dp, admins
-from db.engine import create_db
-from db.engine import session_maker
+from db.pg_engine import create_db
+from db.pg_engine import session_maker
 from handlers.admin_private import admin_private_router
 from handlers.user_router import user_router
 from middlewares.db import DbSessionMiddleware
 
 
 async def set_commands():
-    commands = [BotCommand(command='start', description='Старт'),
-                BotCommand(command='profile', description='Мой профиль')]
+    commands = [BotCommand(command="start", description="Старт"),
+                BotCommand(command="profile", description="Мой профиль")]
     await bot.set_my_commands(commands, BotCommandScopeDefault())
 
 
@@ -20,7 +20,7 @@ async def start_bot():
     await set_commands()
     try:
         for admin_id in admins:
-            await bot.send_message(admin_id, f'Бот запущен🥳.')
+            await bot.send_message(admin_id, f"Бот запущен🥳.")
     except:
         pass
 
@@ -28,7 +28,7 @@ async def start_bot():
 async def stop_bot():
     try:
         for admin_id in admins:
-            await bot.send_message(admin_id, 'Бот остановлен.\n😴')
+            await bot.send_message(admin_id, "Бот остановлен.\n😴")
     except:
         pass
 
@@ -43,7 +43,6 @@ async def main():
     dp.shutdown.register(stop_bot)
 
     try:
-        await bot.delete_webhook(drop_pending_updates=True)
         await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
     finally:
         await bot.session.close()
