@@ -185,4 +185,7 @@ fabric.properties
 .idea
 /logs_db/
 /logs_bot/
+/logs_mailing/
 /Dockerfile
+/docker_compose.yml
+/db/migrations/versions/
