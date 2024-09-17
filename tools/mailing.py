@@ -63,10 +63,9 @@ async def simple_mailing():
 
     for user in users:
         try:
-            for _ in range(50):  # отправьте 10 сообщений за один вызов
-                await bot.copy_message(chat_id=str(user), from_chat_id=str(ch_id), message_id=str(msg_id))
-                logger.info(f"Sent message to {user}")
-                success += 1
+            await bot.copy_message(chat_id=str(user), from_chat_id=str(ch_id), message_id=str(msg_id))
+            logger.info(f"Sent message to {user}")
+            success += 1
             await redis_delete_user(user)
         except Exception as e:
             error_message = str(e)
