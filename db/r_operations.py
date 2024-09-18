@@ -1,3 +1,5 @@
+import json
+
 from db.r_engine import redis_conn
 
 
@@ -13,6 +15,10 @@ async def redis_mailing_msg(msg_id):
 
 async def redis_mailing_from(ch_id):
     await redis_conn.set("msg_from", ch_id, ex=21600)
+
+
+async def redis_mailing_btns(btns):
+    await redis_conn.set("btns_for_mailing", json.dumps(btns), ex=21600)
 
 
 # Delete user from redis after successful mailing

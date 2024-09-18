@@ -66,7 +66,7 @@ async def orm_get_mailing_list(session: AsyncSession):
     return result.scalars().all()
 
 
-async def orm_mailing_users(session: AsyncSession):
-    query = select(func.count(User.id)).where(User.mailing == True)
+async def orm_not_mailing_users(session: AsyncSession):
+    query = select(func.count(User.id)).where(User.mailing == False)
     result = await session.execute(query)
     return result.scalar()
