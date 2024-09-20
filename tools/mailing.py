@@ -1,14 +1,14 @@
 import asyncio
 import datetime
-import json
 import logging
 import re
 
 import tqdm
 
 from create_bot import bot
-from db.r_engine import redis_conn
-from db.r_operations import redis_delete_user
+from db.r_operations import redis_delete_mailing_user, redis_get_mailing_users, redis_get_mailing_msg, \
+    redis_get_msg_from, \
+    redis_get_mailing_btns
 from keyboards.inline import get_callback_btns
 from loggers.setup_logger import module_logger
 
@@ -45,32 +45,13 @@ async def format_timedelta(td, lang="en"):
     return " ".join(parts)
 
 
-async def get_users_for_mailing():
-    users = await redis_conn.smembers("users_for_mailing")
-    return {user.decode("utf-8") for user in users}
-
-
-async def get_msg_for_mailing():
-    return (await redis_conn.get("msg_for_mailing")).decode("utf-8")
-
-
-async def get_msg_from():
-    return (await redis_conn.get("msg_from")).decode("utf-8")
-
-
-async def get_btns_for_mailing():
-    btns_str = (await redis_conn.get("btns_for_mailing")).decode("utf-8")
-    btns_dict = json.loads(btns_str)
-    return btns_dict
-
-
 async def simple_mailing():
     logger.info("=== MAILING STARTED ===")
 
-    users = await get_users_for_mailing()
-    msg_id = await get_msg_for_mailing()
-    ch_id = await get_msg_from()
-    btns: dict = await get_btns_for_mailing()
+    users = await redis_get_mailing_users()
+    msg_id = await redis_get_mailing_msg()
+    ch_id = await redis_get_msg_from()
+    btns: dict = await redis_get_mailing_btns()
     print(btns)
     total_users = len(users)
 
@@ -93,12 +74,12 @@ async def simple_mailing():
                 await bot.copy_message(chat_id=str(user), from_chat_id=str(ch_id), message_id=str(msg_id))
             logger.info(f"Sent message to {user}")
             success += 1
-            await redis_delete_user(user)
+            await redis_delete_mailing_user(user)
         except Exception as e:
             error_message = str(e)
             if re.search(r"Forbidden: bot was blocked by the user", error_message):
                 logger.warning(f"User {user} blocked the bot. Removing from mailing list.")
-                await redis_delete_user(user)
+                await redis_delete_mailing_user(user)
                 blocked += 1
             else:
                 logger.error(f"Failed to send message to {user}: {e}")
