@@ -1,12 +1,13 @@
 from aiogram.filters import BaseFilter
 from aiogram.types import Message
 
-from create_bot import admins
+from db.r_operations import redis_check_admin
 
 
+# Пример использования в фильтре
 class IsAdmin(BaseFilter):
     def __init__(self) -> None:
         pass
 
     async def __call__(self, message: Message) -> bool:
-        return message.from_user.id in admins
+        return await redis_check_admin(message.from_user.id)

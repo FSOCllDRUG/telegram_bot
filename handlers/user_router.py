@@ -4,12 +4,12 @@ from aiogram.types import Message, CallbackQuery
 from aiogram.utils.chat_action import ChatActionSender
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from create_bot import admins
 from create_bot import bot
 from db.pg_orm_query import (
     orm_user_start,
     orm_user_get_data,
     orm_mailing_change)
+from db.r_operations import redis_check_admin
 from keyboards.inline import get_callback_btns, change_mailing_buttons
 from keyboards.reply import main_kb
 
@@ -22,7 +22,7 @@ async def cmd_start(message: Message, session: AsyncSession):
     async with ChatActionSender.typing(bot=bot, chat_id=message.from_user.id):
         if await orm_user_get_data(session, user_id=message.from_user.id) is not None:
             await message.answer(f"Снова привет, {message.from_user.full_name}!",
-                                 reply_markup=main_kb(message.from_user.id in admins))
+                                 reply_markup=main_kb(await redis_check_admin(message.from_user.id)))
         else:
             await orm_user_start(session, data={
                 "user_id": message.from_user.id,
@@ -30,12 +30,12 @@ async def cmd_start(message: Message, session: AsyncSession):
                 "name": message.from_user.full_name,
             })
             await message.answer(f"{message.from_user.full_name}, ты добавлен в базу данных.",
-                                 reply_markup=main_kb(message.from_user.id in admins))
+                                 reply_markup=main_kb(await redis_check_admin(message.from_user.id)))
 
 
 @user_router.message(F.text == "Главное меню")
 async def main_menu(message: Message):
-    await message.answer("Ты в главном меню", reply_markup=main_kb(message.from_user.id in admins))
+    await message.answer("Ты в главном меню", reply_markup=main_kb(await redis_check_admin(message.from_user.id)))
 
 
 @user_router.message(F.text == "Мои данные📝")

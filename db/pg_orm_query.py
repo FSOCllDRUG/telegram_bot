@@ -4,6 +4,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from db.pg_models import User
 
 
+async def orm_get_admins(session: AsyncSession):
+    query = select(User.user_id).where(User.is_admin == True)
+    result = await session.execute(query)
+    return result.scalars().all()
+
+
 async def orm_user_start(session: AsyncSession, data: dict):
     obj = User(
         user_id=data.get("user_id"),
@@ -30,12 +36,6 @@ async def orm_get_all_users(session: AsyncSession):
     query = select(User).order_by(User.id)
     result = await session.execute(query)
     return result.scalars().all()
-
-
-async def orm_count_users(session: AsyncSession):
-    query = select(func.count(User.id))
-    result = await session.execute(query)
-    return result.scalar()
 
 
 async def orm_get_last_10_users(session: AsyncSession):

@@ -2,18 +2,19 @@ from aiogram import F, Router
 from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
-from aiogram.types import Message, CallbackQuery
+from aiogram.types import Message, CallbackQuery, ReplyKeyboardMarkup, KeyboardButton, KeyboardButtonRequestChat
 from aiogram.utils.chat_action import ChatActionSender
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from create_bot import bot
+from create_bot import bot, env_admins
 from db.pg_orm_query import orm_get_last_10_users, orm_count_users, orm_get_mailing_list, orm_not_mailing_users
-from db.r_operations import redis_mailing_users, redis_mailing_msg, redis_mailing_from, redis_mailing_btns
+from db.r_operations import redis_set_mailing_users, redis_set_mailing_msg, redis_set_msg_from, redis_set_mailing_btns
 from filters.chat_type import ChatType
 from filters.is_admin import IsAdmin
 from keyboards.inline import get_callback_btns
 from keyboards.reply import get_keyboard
 from tools.mailing import simple_mailing
+from tools.utils import update_admins
 
 admin_private_router = Router()
 admin_private_router.message.filter(ChatType("private"), IsAdmin())
@@ -56,16 +57,16 @@ class Mailing(StatesGroup):
     buttons = State()
 
 
+# Mailing handlers starts
 @admin_private_router.message(StateFilter(None), F.text == "Сделать рассылку")
 async def make_mailing(message: Message, state: FSMContext):
-
     await message.answer("Отправь сообщение, которое ты хочешь рассылать\n\n"
                          "<b>ВАЖНО</b>\n\n"
                          "В рассылке может быть приложен только <u>один</u> файл*!\n"
                          "<i>Файл— фото/видео/документ/голосовое сообщение/видео сообщение</i>",
                          reply_markup=get_keyboard("Отмена",
                                                    placeholder="Отправьте сообщение, для рассылки"
-    )
+                                                   )
                          )
     await state.set_state(Mailing.message)
 
@@ -116,7 +117,6 @@ async def btns_to_data(message: Message, state: FSMContext):
                                                                                        "Переделать": "cancel_mailing"}))
 
 
-
 @admin_private_router.message(StateFilter(Mailing.message))
 async def get_message_for_mailing(message: Message, state: FSMContext):
     await state.update_data(message=message.message_id)
@@ -143,11 +143,11 @@ async def cancel_mailing(callback: CallbackQuery, state: FSMContext):
 async def confirm_mailing(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
     async with ChatActionSender.typing(bot=bot, chat_id=callback.message.from_user.id):
         await callback.answer("")
-        await redis_mailing_users(await orm_get_mailing_list(session))
+        await redis_set_mailing_users(await orm_get_mailing_list(session))
         data = await state.get_data()
-        await redis_mailing_msg(str(data.get("message")))
-        await redis_mailing_from(str(callback.message.chat.id))
-        await redis_mailing_btns(data.get("buttons"))
+        await redis_set_mailing_msg(str(data.get("message")))
+        await redis_set_msg_from(str(callback.message.chat.id))
+        await redis_set_mailing_btns(data.get("buttons"))
         await state.clear()
 
         success, notsuccess, blocked, elapsed_time_str = await simple_mailing()
@@ -162,8 +162,49 @@ async def confirm_mailing(callback: CallbackQuery, state: FSMContext, session: A
         )
 
 
-@admin_private_router.message(F.text.contains("test"))
-async def test(message: Message):
-    await message.answer("test")
-    await bot.copy_message(chat_id=message.from_user.id, from_chat_id=message.chat.id, message_id=message.message_id,
-                           reply_markup=get_callback_btns(btns={"test": "test"}))
+# Mailing handlers ends
+
+# @admin_private_router.message(F.text.contains("test"))
+# async def test(message: Message):
+#     await message.answer(f"test", reply_markup=get_callback_btns(
+#         btns={"TEST": "https://t.me/tob_tset_test_bot?startgroup=start",
+#               "Я добавил бота!": "added_to_channel"}))
+
+
+# @admin_private_router.callback_query(F.data == "added_to_channel")
+# async def added_to_channel(callback: CallbackQuery):
+#     await callback.answer("")
+#     await callback.message.answer("Чтобы подключить канал, сделайте бота его администратором, дав следующие права:\n"
+#                                   "\n✅ Отправка сообщений"
+#                                   "\n✅ Удаление сообщений"
+#                                   "\n✅ Редактирование сообщений\n"
+#
+#                                   "А затем перешлите любое сообщение из канала в диалог с ботом либо отправьте публичную ссылку на ваш канал.",
+#                                   reply_markup=ReplyKeyboardMarkup(
+#                                       keyboard=[
+#                                           [
+#                                               KeyboardButton(
+#                                                   text="Отправить чат",
+#                                                   request_chat=KeyboardButtonRequestChat(request_id=1,
+#                                                                                          chat_is_channel=True,
+#                                                                                          chat_is_created=True,
+#                                                                                          bot_is_member=True)
+#                                                   # request_users=KeyboardButtonRequestChat(request_id=1),
+#                                               )
+#                                           ]
+#                                       ],
+#                                       resize_keyboard=True,
+#                                   ),
+#                                   )
+#
+#
+# @admin_private_router.message(F.chat_shared)
+# async def chat_shared(message: Message):
+#     await message.answer(f'{message.chat_shared}')
+#     # if await get_chat_member(chat_id=)
+
+# Update admins list in Redis
+@admin_private_router.message(F.text == "/admin")
+async def upd_admin_list(message: Message, session: AsyncSession):
+    admins = await update_admins(session, env_admins)
+    await message.answer(f'{admins}')

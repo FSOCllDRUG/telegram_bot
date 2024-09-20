@@ -3,8 +3,13 @@ import json
 from db.r_engine import redis_conn
 
 
-async def redis_set_admins(admins):
+async def redis_upd_admins(admins):
+    await redis_conn.delete("admins")
     await redis_conn.sadd("admins", *admins)
+
+
+async def redis_check_admin(user_id) -> bool:
+    return await redis_conn.sismember("admins", user_id)
 
 
 async def redis_get_admins():

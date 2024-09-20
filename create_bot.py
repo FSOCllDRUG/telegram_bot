@@ -8,7 +8,11 @@ from aiogram.fsm.storage.redis import RedisStorage
 
 from loggers.setup_logger import module_logger
 
-admins = [int(admin_id) for admin_id in config("ADMINS").split(",")]
+
+env_admins = [int(admin_id) for admin_id in config("ADMINS").split(",")]
+
+
+
 
 module_logger("aiogram", "logs_bot", "bot.log", logging.INFO, console=True)
 module_logger("sqlalchemy", "logs_db", "db.log", logging.WARNING)
