@@ -9,7 +9,7 @@ async def redis_set_admins(admins):
 
 async def redis_get_admins():
     admins = await redis_conn.smembers("admins")
-    return {admin.decode("utf-8") for admin in admins}
+    return set(admins)
 
 
 # Add group of users to redis
@@ -19,7 +19,7 @@ async def redis_set_mailing_users(users):
 
 async def redis_get_mailing_users():
     users = await redis_conn.smembers("users_for_mailing")
-    return {user.decode("utf-8") for user in users}
+    return set(users)
 
 
 # Delete user from redis after successful mailing
@@ -32,7 +32,7 @@ async def redis_set_mailing_msg(msg_id):
 
 
 async def redis_get_mailing_msg():
-    return (await redis_conn.get("msg_for_mailing")).decode("utf-8")
+    return await redis_conn.get("msg_for_mailing")
 
 
 async def redis_set_msg_from(ch_id):
@@ -40,7 +40,7 @@ async def redis_set_msg_from(ch_id):
 
 
 async def redis_get_msg_from():
-    return (await redis_conn.get("msg_from")).decode("utf-8")
+    return await redis_conn.get("msg_from")
 
 
 async def redis_set_mailing_btns(btns):
@@ -48,6 +48,6 @@ async def redis_set_mailing_btns(btns):
 
 
 async def redis_get_mailing_btns():
-    btns_str = (await redis_conn.get("btns_for_mailing")).decode("utf-8")
+    btns_str = await redis_conn.get("btns_for_mailing")
     btns_dict = json.loads(btns_str)
     return btns_dict
