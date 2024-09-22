@@ -1,7 +1,7 @@
-from sqlalchemy import select, func, update
+from sqlalchemy import select, func, update, insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from db.pg_models import User
+from db.pg_models import User, Channel, user_channel_association
 
 
 async def orm_get_admins(session: AsyncSession):
@@ -70,3 +70,25 @@ async def orm_not_mailing_users(session: AsyncSession):
     query = select(func.count(User.id)).where(User.mailing == False)
     result = await session.execute(query)
     return result.scalar()
+
+
+async def orm_add_channel(session: AsyncSession, channel_id: int):
+    obj = Channel(channel_id=channel_id)
+    session.add(obj)
+    await session.commit()
+
+
+async def orm_get_channels_for_admin(session: AsyncSession, admin_user_id: int):
+    query = select(Channel).join(user_channel_association).join(User).where(User.user_id == admin_user_id,
+                                                                            User.is_admin == True)
+    result = await session.execute(query)
+    return result.scalars().all()
+
+
+async def orm_add_admin_to_channel(session: AsyncSession, user_id: int, channel_id: int):
+    query = (
+        insert(user_channel_association)
+        .values(user_id=user_id, channel_id=channel_id)
+    )
+    await session.execute(query)
+    await session.commit()

@@ -2,19 +2,21 @@ from aiogram import F, Router
 from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
-from aiogram.types import Message, CallbackQuery, ReplyKeyboardMarkup, KeyboardButton, KeyboardButtonRequestChat
+from aiogram.types import Message, CallbackQuery
 from aiogram.utils.chat_action import ChatActionSender
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from create_bot import bot, env_admins
-from db.pg_orm_query import orm_get_last_10_users, orm_count_users, orm_get_mailing_list, orm_not_mailing_users
-from db.r_operations import redis_set_mailing_users, redis_set_mailing_msg, redis_set_msg_from, redis_set_mailing_btns
+from db.pg_orm_query import orm_get_last_10_users, orm_count_users, orm_get_mailing_list, orm_not_mailing_users, \
+    orm_add_channel, orm_add_admin_to_channel, orm_get_channels_for_admin
+from db.r_operations import redis_set_mailing_users, redis_set_mailing_msg, redis_set_msg_from, redis_set_mailing_btns, \
+    redis_check_channel
 from filters.chat_type import ChatType
 from filters.is_admin import IsAdmin
 from keyboards.inline import get_callback_btns
 from keyboards.reply import get_keyboard
 from tools.mailing import simple_mailing
-from tools.utils import update_admins
+from tools.utils import update_admins, get_channel_id
 
 admin_private_router = Router()
 admin_private_router.message.filter(ChatType("private"), IsAdmin())
@@ -164,47 +166,92 @@ async def confirm_mailing(callback: CallbackQuery, state: FSMContext, session: A
 
 # Mailing handlers ends
 
-# @admin_private_router.message(F.text.contains("test"))
-# async def test(message: Message):
-#     await message.answer(f"test", reply_markup=get_callback_btns(
-#         btns={"TEST": "https://t.me/tob_tset_test_bot?startgroup=start",
-#               "Я добавил бота!": "added_to_channel"}))
-
-
-# @admin_private_router.callback_query(F.data == "added_to_channel")
-# async def added_to_channel(callback: CallbackQuery):
-#     await callback.answer("")
-#     await callback.message.answer("Чтобы подключить канал, сделайте бота его администратором, дав следующие права:\n"
-#                                   "\n✅ Отправка сообщений"
-#                                   "\n✅ Удаление сообщений"
-#                                   "\n✅ Редактирование сообщений\n"
-#
-#                                   "А затем перешлите любое сообщение из канала в диалог с ботом либо отправьте публичную ссылку на ваш канал.",
-#                                   reply_markup=ReplyKeyboardMarkup(
-#                                       keyboard=[
-#                                           [
-#                                               KeyboardButton(
-#                                                   text="Отправить чат",
-#                                                   request_chat=KeyboardButtonRequestChat(request_id=1,
-#                                                                                          chat_is_channel=True,
-#                                                                                          chat_is_created=True,
-#                                                                                          bot_is_member=True)
-#                                                   # request_users=KeyboardButtonRequestChat(request_id=1),
-#                                               )
-#                                           ]
-#                                       ],
-#                                       resize_keyboard=True,
-#                                   ),
-#                                   )
-#
-#
-# @admin_private_router.message(F.chat_shared)
-# async def chat_shared(message: Message):
-#     await message.answer(f'{message.chat_shared}')
-#     # if await get_chat_member(chat_id=)
 
 # Update admins list in Redis
 @admin_private_router.message(F.text == "/admin")
 async def upd_admin_list(message: Message, session: AsyncSession):
     admins = await update_admins(session, env_admins)
     await message.answer(f'{admins}')
+
+
+# Add channel handlers
+class AddChannel(StatesGroup):
+    admin_id = State()
+    channel_id = State()
+
+
+@admin_private_router.message(F.text == "Добавить канал")
+async def start_add_channel(message: Message, state: FSMContext):
+    await state.update_data(admin_id=message.from_user.id)
+    await message.answer("Добавь меня в <b>свой</b> канал с <b><i><u>правами администратора</u></i></b>\n\n"
+                         "Необходимые права для работы бота:\n"
+                         "\n✅ Отправка сообщений"
+                         "\n✅ Удаление сообщений"
+                         "\n✅ Редактирование сообщений\n\n"
+                         "После того как добавишь меня в канал, нажми на кнопку⬇️",
+                         reply_markup=get_callback_btns(btns={"Я добавил бота!": "added_to_channel"}))
+    await state.set_state(AddChannel.channel_id)
+
+
+@admin_private_router.callback_query(StateFilter(AddChannel.channel_id), F.data == "added_to_channel")
+async def bot_added_to_channel(callback: CallbackQuery):
+    await callback.answer("")
+    await callback.message.answer("Супер!\n"
+                                  "Теперь перешли любой пост из канала в диалог с ботом, "
+                                  "либо отправь публичную ссылку или айди начинающийся с @ твоего канала")
+
+
+@admin_private_router.message(StateFilter(AddChannel.channel_id))
+async def check_channel(message: Message, session: AsyncSession, state: FSMContext):
+    channel_id = await get_channel_id(message)
+    print(channel_id)
+    print(type(channel_id))
+    user_id = message.from_user.id
+    print(user_id)
+    print(type(user_id))
+    if channel_id:
+        await message.reply(f"ID канала: {channel_id}")
+        check = await redis_check_channel(user_id, channel_id)
+        print(check)
+        if check:
+            await orm_add_channel(session, channel_id)
+            await orm_add_admin_to_channel(session, user_id, channel_id)
+            await message.answer('Канал добавлен успешно!')
+            await state.clear()
+    else:
+        await message.answer("Я не смог разобрать твоё сообщение, пожалуйста, следуй условиям описанным выше!")
+
+
+@admin_private_router.message(F.text == "Мои каналы")
+async def get_user_channels(message: Message, session: AsyncSession, state: FSMContext):
+    user_id = message.from_user.id
+    channels = await orm_get_channels_for_admin(session, user_id)
+    if not channels:
+        await message.answer("У тебя нет каналов 🫥")
+        return
+    channels_str = ""
+    btns = {}
+    for channel in channels:
+        chat = await bot.get_chat(channel.channel_id)
+        channels_str += f"<a href='{chat.invite_link}'>{chat.title}</a>\n"
+        btns[chat.title] = f"channel_{channel.channel_id}"
+    await message.answer(f"Твои каналы:\n{channels_str}",
+                         reply_markup=get_callback_btns(btns=btns))
+
+
+@admin_private_router.callback_query(F.data.startswith("channel_"))
+async def channel_choosen(callback: CallbackQuery):
+    channel_id = int(callback.data.split("_")[1])
+    await callback.answer("")
+    await callback.message.answer(
+        "Выберите действие:\n"
+        "1. Создать пост для канала\n"
+        "2. Добавить другого администратора в канал\n",
+        reply_markup=get_callback_btns(
+            btns={
+                "1. Создать пост для канала": f"create_post_{channel_id}",
+                "2. Добавить другого администратора в канал": f"add_admin_to_channel_{channel_id}"
+            }
+        )
+    )
+

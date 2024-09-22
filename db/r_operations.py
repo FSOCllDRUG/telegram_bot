@@ -17,6 +17,20 @@ async def redis_get_admins():
     return set(admins)
 
 
+async def redis_temp_channel(us_id, ch_id):
+    await redis_conn.set(f"{us_id}", ch_id, ex=600)
+
+
+async def redis_check_channel(us_id, ch_id):
+    value = int(await redis_conn.get(f"{us_id}"))
+    print(value)
+    print(type(value))
+    if value == ch_id:
+        return True
+    else:
+        return False
+
+
 # Add group of users to redis
 async def redis_set_mailing_users(users):
     await redis_conn.sadd("users_for_mailing", *users)

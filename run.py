@@ -1,6 +1,5 @@
 import asyncio
 from functools import partial
-from typing import Any
 
 from aiogram.types import BotCommand, BotCommandScopeDefault
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -8,13 +7,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from create_bot import bot, dp, env_admins
 from db.pg_engine import create_db
 from db.pg_engine import session_maker
-from db.pg_orm_query import orm_get_admins
-from db.r_operations import redis_upd_admins
 from handlers.admin_private import admin_private_router
 from handlers.channels import channel_router
 from handlers.user_router import user_router
 from middlewares.db import DbSessionMiddleware
-from tools.utils import Union, update_admins
+from tools.utils import update_admins
 
 
 async def set_commands():
