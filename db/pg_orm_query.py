@@ -4,12 +4,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from db.pg_models import User, Channel, user_channel_association
 
 
-async def orm_get_admins(session: AsyncSession):
-    query = select(User.user_id).where(User.is_admin == True)
-    result = await session.execute(query)
-    return result.scalars().all()
-
-
 async def orm_user_start(session: AsyncSession, data: dict):
     obj = User(
         user_id=data.get("user_id"),
@@ -66,7 +60,7 @@ async def orm_get_mailing_list(session: AsyncSession):
     return result.scalars().all()
 
 
-async def orm_not_mailing_users(session: AsyncSession):
+async def orm_not_mailing_users_count(session: AsyncSession):
     query = select(func.count(User.id)).where(User.mailing == False)
     result = await session.execute(query)
     return result.scalar()
@@ -92,3 +86,15 @@ async def orm_add_admin_to_channel(session: AsyncSession, user_id: int, channel_
     )
     await session.execute(query)
     await session.commit()
+
+
+async def orm_get_admins(session: AsyncSession):
+    query = select(User).where(User.is_admin == True)
+    result = await session.execute(query)
+    return result.scalars().all()
+
+
+async def orm_get_admins_id(session: AsyncSession):
+    query = select(User.user_id).where(User.is_admin == True)
+    result = await session.execute(query)
+    return result.scalars().all()

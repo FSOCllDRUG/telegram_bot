@@ -55,3 +55,21 @@ def main_kb(admin: bool):
         input_field_placeholder="Воспользуйтесь меню:"
     )
 
+
+def admin_kb():
+    kb_list = [
+        # [KeyboardButton(text="Добавить админа"),
+        #  KeyboardButton(text="Удалить админа")],
+        # [KeyboardButton(text="Посмотреть админов")]
+        [KeyboardButton(text="Мои каналы"),
+         KeyboardButton(text="Рассылка")],
+        [KeyboardButton(text="Главное меню")]
+    ]
+    # if env_admin:
+    #     kb_list.append([KeyboardButton(text="Добавить админа")])
+    return ReplyKeyboardMarkup(
+        keyboard=kb_list,
+        resize_keyboard=True,
+        one_time_keyboard=False,
+        input_field_placeholder="Воспользуйтесь меню:"
+    )

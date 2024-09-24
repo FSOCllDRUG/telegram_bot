@@ -22,13 +22,11 @@ async def redis_temp_channel(us_id, ch_id):
 
 
 async def redis_check_channel(us_id, ch_id):
-    value = int(await redis_conn.get(f"{us_id}"))
-    print(value)
-    print(type(value))
-    if value == ch_id:
-        return True
-    else:
+    value = await redis_conn.get(f"{us_id}")
+    if value is None:
         return False
+    else:
+        return int(value) == ch_id
 
 
 # Add group of users to redis

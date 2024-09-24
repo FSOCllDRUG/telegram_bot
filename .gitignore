@@ -189,3 +189,4 @@ fabric.properties
 /Dockerfile
 /docker_compose.yml
 /db/migrations/versions/
+/test.py
