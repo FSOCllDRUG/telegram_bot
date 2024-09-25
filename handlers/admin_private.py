@@ -8,15 +8,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from create_bot import bot, env_admins
 from db.pg_orm_query import orm_get_last_10_users, orm_count_users, orm_get_mailing_list, orm_not_mailing_users_count, \
-    orm_add_channel, orm_add_admin_to_channel, orm_get_channels_for_admin, orm_get_admins
+    orm_add_channel, orm_add_admin_to_channel, orm_get_channels_for_admin, orm_get_user_data, \
+    orm_add_admin
 from db.r_operations import redis_set_mailing_users, redis_set_mailing_msg, redis_set_msg_from, redis_set_mailing_btns, \
-    redis_check_channel
+    redis_check_channel, redis_check_admin
 from filters.chat_type import ChatType
-from filters.is_admin import IsAdmin
+from filters.is_admin import IsAdmin, IsOwner
 from keyboards.inline import get_callback_btns
 from keyboards.reply import get_keyboard, admin_kb
 from tools.mailing import simple_mailing
-from tools.utils import update_admins, get_channel_id, cbk_msg, msg_to_cbk
+from tools.utils import update_admins, get_chat_id, cbk_msg, msg_to_cbk, link_to_dev, admins_list_text
 
 admin_private_router = Router()
 admin_private_router.message.filter(ChatType("private"), IsAdmin())
@@ -46,19 +47,20 @@ async def get_profile(message: Message, session: AsyncSession):
                 admin_text += f"🔑 Логин: @{user.username}\n"
 
         if message.from_user.id in env_admins:
-            admin_text += "\n\nСписок администраторов:\n\n"
-            added_admins = await orm_get_admins(session)
-            i = 1
-            for admin in added_admins:
-                user_link = f"<a href='tg://user?id={admin.user_id}'>{admin.user_id}</a>"
-                admin_text += (
-                    f"{i}. 👤 Телеграм ID: {user_link}\n"
-                    f"📝 Полное имя: {admin.name}\n"
-                )
-
-                if user.username is not None:
-                    admin_text += f"🔑 Логин: @{admin.username}\n"
-                i += 1
+            admin_text += await admins_list_text(session)
+            # admin_text += "\n\nСписок администраторов:\n\n"
+            # added_admins = await orm_get_admins(session)
+            # i = 1
+            # for admin in added_admins:
+            #     user_link = f"<a href='tg://user?id={admin.user_id}'>{admin.user_id}</a>"
+            #     admin_text += (
+            #         f"{i}.👤 Телеграм ID: {user_link}\n"
+            #         f"📝 Полное имя: {admin.name}\n"
+            #     )
+            #
+            #     if admin.username is not None:
+            #         admin_text += f"🔑 Логин: @{admin.username}\n"
+            #     i += 1
 
     await message.answer(admin_text, reply_markup=admin_kb())
 
@@ -92,7 +94,7 @@ async def make_mailing(message: Message, state: FSMContext):
 async def get_message_for_mailing(message: Message, state: FSMContext):
     await state.update_data(message=message.message_id)
     await state.set_state(Mailing.buttons)
-    await message.reply("Будем добавлять кнопки к сообщению?", reply_markup=get_callback_btns(
+    await message.reply("Будем добавлять URLкнопки к сообщению?", reply_markup=get_callback_btns(
         btns={"Да": "add_btns",
               "Приступить к рассылке": "confirm_mailing", "Сделать другое сообщение для рассылки": "cancel_mailing"}
     )
@@ -214,10 +216,8 @@ async def bot_added_to_channel(callback: CallbackQuery):
 
 @admin_private_router.message(StateFilter(AddChannel.channel_id))
 async def check_channel(message: Message, session: AsyncSession, state: FSMContext):
-    channel_id = await get_channel_id(message)
-    print(channel_id)
+    channel_id = await get_chat_id(message)
     user_id = message.from_user.id
-    print(user_id)
     if channel_id:
         await message.reply(f"ID канала: {channel_id}")
         check = await redis_check_channel(user_id, channel_id)
@@ -230,6 +230,89 @@ async def check_channel(message: Message, session: AsyncSession, state: FSMConte
             await message.answer("Либо ты меня ещё не добавил в канал, либо что-то пошло не так :(")
     else:
         await message.answer("Я не смог разобрать твоё сообщение, пожалуйста, следуй условиям описанным выше!")
+
+
+@admin_private_router.message(F.text == "Список админов", IsOwner())
+async def add_admin_to_bot(message: Message, session: AsyncSession):
+    text: str = "Владелец бота:\n"
+    owner: int = env_admins[1]
+    id_for_query = int(owner)
+    user = await orm_get_user_data(session, id_for_query)
+    user_link = f"<a href='tg://user?id={user.user_id}'>{user.user_id}</a>"
+    text += (
+        f"👤 Телеграм ID: {user_link}\n"
+        f"📝 Полное имя: {user.name}\n"
+    )
+
+    if user.username is not None:
+        text += f"🔑 Логин: @{user.username}\n"
+
+    if message.from_user.id in env_admins:
+        text += await admins_list_text(session)
+    await message.answer(text=text,
+                         reply_markup=get_callback_btns(btns={"Добавить админа": "add_admin",
+                                                              "Стукнуть разраба":
+                                                                  link_to_dev},
+                                                        sizes=(1,)))
+
+
+class AddAdmin(StatesGroup):
+    user_id = State()
+    confirm = State()
+
+
+@admin_private_router.callback_query(F.data == "add_admin")
+async def add_admin(callback: CallbackQuery, state: FSMContext):
+    await callback.answer("")
+    await state.set_state(AddAdmin.user_id)
+    await callback.message.answer("Перешли сообщение от юзера, которого хочешь сделать админом\n\n"
+                                  "‼️<b><u>ВАЖНО</u></b>‼️\n"
+                                  "Это должен быть пользователь, который взаимодействовал с ботом",
+                                  reply_markup=get_keyboard("Отмена"))
+
+
+@admin_private_router.message(AddAdmin.user_id)
+async def get_admin_id(message: Message, state: FSMContext, session: AsyncSession):
+    try:
+        text = "Ты хочешь сделать администратором пользователя:\n\n"
+        user_id = await get_chat_id(message)
+        await state.update_data(user_id=user_id)
+        user = await orm_get_user_data(session, user_id)
+        if user is None:
+            await message.answer("Пользователь ещё не запускал бота!")
+            return
+        elif await redis_check_admin(user_id):
+            await message.answer("Пользователь уже админ!\n"
+                                 "Возвращаю тебя в админ панель", reply_markup=admin_kb())
+            await state.clear()
+            return
+        user_link = f"<a href='tg://user?id={user.user_id}'>{user.user_id}</a>"
+        text += (
+            f"👤 Телеграм ID: {user_link}\n"
+            f"📝 Полное имя: {user.name}\n"
+        )
+
+        if user.username is not None:
+            text += f"🔑 Логин: @{user.username}\n"
+        await message.answer(text=text,
+                             reply_markup=get_callback_btns(btns={"Подтвердить":
+                                                                      "confirm"}))
+        await state.set_state(AddAdmin.confirm)
+    except ValueError:
+        await message.answer("Некорректный ID админа, попробуй снова!")
+
+
+@admin_private_router.callback_query(F.data == "confirm", StateFilter(AddAdmin.confirm))
+async def add_admin_done(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
+    await callback.answer("")
+    data = await state.get_data()
+    admin_id = data.get("user_id")
+    await orm_add_admin(session, admin_id)
+    text = "Администратор добавлен в базу данных!"
+    text += await admins_list_text(session)
+    await callback.message.answer(text=text,reply_markup=admin_kb())
+    await update_admins(session, env_admins)
+    await state.clear()
 
 
 @admin_private_router.callback_query(F.data.startswith("channel_"))
@@ -277,7 +360,7 @@ async def make_mailing(callback: CallbackQuery, state: FSMContext):
 async def get_message_for_post(message: Message, state: FSMContext):
     await state.update_data(message=message.message_id)
     await state.set_state(CreatePost.buttons)
-    await message.reply("Будем добавлять кнопки к посту?", reply_markup=get_callback_btns(
+    await message.reply("Будем добавлять URL-кнопки к посту?", reply_markup=get_callback_btns(
         btns={"Да": "add_btns",
               "Пост без кнопок": "confirm_post", "Сделать другое сообщение для рассылки": "cancel_post"}
     )

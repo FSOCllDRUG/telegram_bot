@@ -63,6 +63,7 @@ def admin_kb():
         # [KeyboardButton(text="Посмотреть админов")]
         [KeyboardButton(text="Мои каналы"),
          KeyboardButton(text="Рассылка")],
+        [KeyboardButton(text="Список админов")],
         [KeyboardButton(text="Главное меню")]
     ]
     # if env_admin:

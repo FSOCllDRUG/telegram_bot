@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from create_bot import bot
 from db.pg_orm_query import (
     orm_user_start,
-    orm_user_get_data,
+    orm_get_user_data,
     orm_mailing_change)
 from db.r_operations import redis_check_admin
 from keyboards.inline import get_callback_btns, change_mailing_buttons
@@ -20,7 +20,7 @@ user_router = Router()
 @user_router.message(CommandStart())
 async def cmd_start(message: Message, session: AsyncSession):
     async with ChatActionSender.typing(bot=bot, chat_id=message.from_user.id):
-        if await orm_user_get_data(session, user_id=message.from_user.id) is not None:
+        if await orm_get_user_data(session, user_id=message.from_user.id) is not None:
             await message.answer(f"Снова привет, {message.from_user.full_name}!",
                                  reply_markup=main_kb(await redis_check_admin(message.from_user.id)))
         else:
@@ -41,7 +41,7 @@ async def main_menu(message: Message):
 @user_router.message(F.text == "Мои данные📝")
 async def user_credentials(message: Message, session: AsyncSession):
     async with ChatActionSender.typing(bot=bot, chat_id=message.from_user.id):
-        user = await orm_user_get_data(session, user_id=message.from_user.id)
+        user = await orm_get_user_data(session, user_id=message.from_user.id)
         subscription_status = "Да" if user.mailing else "Нет"
         subscription_button_text = "Подписаться на рассылку" if not user.mailing else "Отписаться от рассылки"
         subscription_button_data = f"change_mailing_{user.user_id}_{str(int(not user.mailing))}"
@@ -67,7 +67,7 @@ async def toggle_mailing_subscription(callback: CallbackQuery, session: AsyncSes
     await orm_mailing_change(session, user_id=user_id, mailing=sub_status)
 
     # Fetch updated user data
-    user = await orm_user_get_data(session, user_id=user_id)
+    user = await orm_get_user_data(session, user_id=user_id)
     subscription_status = "Да" if user.mailing else "Нет"
     reply_text = (
         f"Ваш ID: {user.user_id}\n"
