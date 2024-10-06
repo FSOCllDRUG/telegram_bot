@@ -8,7 +8,7 @@ from db.r_operations import redis_upd_admins
 
 async def admins_list_text(session: AsyncSession):
     text = ""
-    text += "\n\nСписок добавленных администраторов:\n\n"
+    text += "\n\nСписок добавленных администраторов:\n💼\n"
     added_admins = await orm_get_admins(session)
     i = 1
     for admin in added_admins:

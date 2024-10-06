@@ -7,11 +7,11 @@ from aiogram.utils.chat_action import ChatActionSender
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from create_bot import bot, env_admins
-from db.pg_orm_query import orm_get_last_10_users, orm_count_users, orm_get_mailing_list, orm_not_mailing_users_count, \
+from db.pg_orm_query import orm_count_users, orm_get_mailing_list, orm_not_mailing_users_count, \
     orm_add_channel, orm_add_admin_to_channel, orm_get_channels_for_admin, orm_get_user_data, \
     orm_add_admin
 from db.r_operations import redis_set_mailing_users, redis_set_mailing_msg, redis_set_msg_from, redis_set_mailing_btns, \
-    redis_check_channel, redis_check_admin
+    redis_check_channel, redis_check_admin, get_active_users_count
 from filters.chat_type import ChatType
 from filters.is_admin import IsAdmin, IsOwner
 from keyboards.inline import get_callback_btns
@@ -28,40 +28,23 @@ async def get_profile(message: Message, session: AsyncSession):
     async with ChatActionSender.typing(bot=bot, chat_id=message.from_user.id):
         count = await orm_count_users(session)
         mailing_count = await orm_not_mailing_users_count(session)
-
-        last_users_data = await orm_get_last_10_users(session)
-        last_users_data = last_users_data[::-1]
         admin_text = (
-            f"👥 В базе данных <b>{count}</b> человек, из них отписаны от рассылки {mailing_count}. \n"
-            f"Вот последние 10 пользователей:\n\n"
+            f"👥\nВ базе данных <b>{count}</b> человек, из них отписаны от рассылки {mailing_count}. \n"
+            f"\n\n"
         )
 
-        for user in last_users_data:
-            user_link = f"<a href='tg://user?id={user.user_id}'>{user.user_id}</a>"
-            admin_text += (
-                f"{user.id}. 👤 Телеграм ID: {user_link}\n"
-                f"📝 Полное имя: {user.name}\n"
-            )
+        active_users_day = await get_active_users_count(1)
+        active_users_week = await get_active_users_count(7)
+        active_users_month = await get_active_users_count(30)
 
-            if user.username is not None:
-                admin_text += f"🔑 Логин: @{user.username}\n"
+        admin_text += (f"Количество активных пользователей:\n👥🗓\n"
+                       f"День: {active_users_day}\n"
+                       f"Неделя: {active_users_week}\n"
+                       f"Месяц: {active_users_month}"
+                       )
 
         if message.from_user.id in env_admins:
             admin_text += await admins_list_text(session)
-            # admin_text += "\n\nСписок администраторов:\n\n"
-            # added_admins = await orm_get_admins(session)
-            # i = 1
-            # for admin in added_admins:
-            #     user_link = f"<a href='tg://user?id={admin.user_id}'>{admin.user_id}</a>"
-            #     admin_text += (
-            #         f"{i}.👤 Телеграм ID: {user_link}\n"
-            #         f"📝 Полное имя: {admin.name}\n"
-            #     )
-            #
-            #     if admin.username is not None:
-            #         admin_text += f"🔑 Логин: @{admin.username}\n"
-            #     i += 1
-
     await message.answer(admin_text, reply_markup=admin_kb())
 
 
@@ -95,7 +78,7 @@ async def get_message_for_mailing(message: Message, state: FSMContext):
     await state.update_data(message=message.message_id)
     await state.set_state(Mailing.buttons)
     await message.reply("Будем добавлять URLкнопки к сообщению?", reply_markup=get_callback_btns(
-        btns={"Да": "add_btns",
+        btns={"Добавить кнопки": "add_btns",
               "Приступить к рассылке": "confirm_mailing", "Сделать другое сообщение для рассылки": "cancel_mailing"}
     )
                         )
@@ -310,7 +293,7 @@ async def add_admin_done(callback: CallbackQuery, state: FSMContext, session: As
     await orm_add_admin(session, admin_id)
     text = "Администратор добавлен в базу данных!"
     text += await admins_list_text(session)
-    await callback.message.answer(text=text,reply_markup=admin_kb())
+    await callback.message.answer(text=text, reply_markup=admin_kb())
     await update_admins(session, env_admins)
     await state.clear()
 
@@ -412,3 +395,6 @@ async def confirm_mailing(callback: CallbackQuery, state: FSMContext):
         await callback.message.answer("Пост успешно создан!")
 
         await state.clear()
+
+
+

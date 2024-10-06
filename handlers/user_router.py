@@ -12,8 +12,10 @@ from db.pg_orm_query import (
 from db.r_operations import redis_check_admin
 from keyboards.inline import get_callback_btns, change_mailing_buttons
 from keyboards.reply import main_kb
+from middlewares.activity_middleware import ActivityMiddleware
 
 user_router = Router()
+user_router.message.middleware(ActivityMiddleware())
 
 
 # "/start" handler
