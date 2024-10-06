@@ -167,8 +167,6 @@ async def get_user_channels(message: Message, session: AsyncSession, state: FSMC
     btns["Добавить канал"] = "add_channel"
     await message.answer(f"Твои каналы:\n{channels_str}",
                          reply_markup=get_callback_btns(btns=btns, sizes=(1,)))
-    # await message.answer("Нужно добавить новый канал?",
-    #                      reply_markup=get_callback_btns(btns={"Добавить канал": "add_channel"}))
 
 
 class AddChannel(StatesGroup):
@@ -233,11 +231,21 @@ async def add_admin_to_bot(message: Message, session: AsyncSession):
 
     if message.from_user.id in env_admins:
         text += await admins_list_text(session)
+        admins = await orm_get_admins(session)
+        for admin in admins:
+            channels = await orm_get_channels_for_admin(session, admin.user_id)
+            if channels:
+                channels_str = ""
+                for channel in channels:
+                    chat = await bot.get_chat(channel.channel_id)
+                    channels_str += f"<a href='{chat.invite_link}'>{chat.title}</a>\n"
+                text += f"Каналы:\n{channels_str}"
+            else:
+                text += "Не подключен к каналам\n"
     await message.answer(text=text,
                          reply_markup=get_callback_btns(btns={"Добавить админа": "add_admin",
                                                               "Удалить админа": "del_admin",
-                                                              "Стукнуть разраба":
-                                                                  link_to_dev},
+                                                              "Стукнуть разраба": link_to_dev},
                                                         sizes=(1,)))
 
 
