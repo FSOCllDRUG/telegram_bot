@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from create_bot import bot, env_admins
 from db.pg_orm_query import orm_count_users, orm_get_mailing_list, orm_not_mailing_users_count, \
     orm_add_channel, orm_add_admin_to_channel, orm_get_channels_for_admin, orm_get_user_data, \
-    orm_add_admin
+    orm_add_admin, orm_get_admins, orm_delete_admin
 from db.r_operations import redis_set_mailing_users, redis_set_mailing_msg, redis_set_msg_from, redis_set_mailing_btns, \
     redis_check_channel, redis_check_admin, get_active_users_count
 from filters.chat_type import ChatType
@@ -77,7 +77,7 @@ async def make_mailing(message: Message, state: FSMContext):
 async def get_message_for_mailing(message: Message, state: FSMContext):
     await state.update_data(message=message.message_id)
     await state.set_state(Mailing.buttons)
-    await message.reply("Будем добавлять URLкнопки к сообщению?", reply_markup=get_callback_btns(
+    await message.reply("Будем добавлять URL-кнопки к сообщению?", reply_markup=get_callback_btns(
         btns={"Добавить кнопки": "add_btns",
               "Приступить к рассылке": "confirm_mailing", "Сделать другое сообщение для рассылки": "cancel_mailing"}
     )
@@ -164,10 +164,11 @@ async def get_user_channels(message: Message, session: AsyncSession, state: FSMC
         chat = await bot.get_chat(channel.channel_id)
         channels_str += f"<a href='{chat.invite_link}'>{chat.title}</a>\n"
         btns[chat.title] = f"channel_{channel.channel_id}"
+    btns["Добавить канал"] = "add_channel"
     await message.answer(f"Твои каналы:\n{channels_str}",
-                         reply_markup=get_callback_btns(btns=btns))
-    await message.answer("Нужно добавить новый канал?",
-                         reply_markup=get_callback_btns(btns={"Добавить канал": "add_channel"}))
+                         reply_markup=get_callback_btns(btns=btns, sizes=(1,)))
+    # await message.answer("Нужно добавить новый канал?",
+    #                      reply_markup=get_callback_btns(btns={"Добавить канал": "add_channel"}))
 
 
 class AddChannel(StatesGroup):
@@ -234,9 +235,33 @@ async def add_admin_to_bot(message: Message, session: AsyncSession):
         text += await admins_list_text(session)
     await message.answer(text=text,
                          reply_markup=get_callback_btns(btns={"Добавить админа": "add_admin",
+                                                              "Удалить админа": "del_admin",
                                                               "Стукнуть разраба":
                                                                   link_to_dev},
                                                         sizes=(1,)))
+
+
+@admin_private_router.callback_query(F.data == "del_admin")
+async def del_admin(callback: CallbackQuery, session: AsyncSession):
+    await callback.answer("")
+    admins = await orm_get_admins(session)
+    btns = {}
+    for admin in admins:
+        btns[f"{admin.name} ({admin.user_id})"] = f"delete_admin_{admin.user_id}"
+    await callback.message.answer("Добавленные администраторы:",
+                                  reply_markup=get_callback_btns(btns=btns, sizes=(1,)))
+
+
+@admin_private_router.callback_query(F.data.startswith("delete_admin_"))
+async def delete_admin(callback: CallbackQuery, session: AsyncSession):
+    admin_id = int(callback.data.split("_")[-1])
+    await orm_delete_admin(session, admin_id)
+    await update_admins(session, env_admins)
+    admins = await orm_get_admins(session)
+    btns = {}
+    for admin in admins:
+        btns[f"{admin.name} ({admin.user_id})"] = f"delete_admin_{admin.user_id}"
+    await callback.message.edit_text("Администратор успешно удалён!")
 
 
 class AddAdmin(StatesGroup):
@@ -395,6 +420,3 @@ async def confirm_mailing(callback: CallbackQuery, state: FSMContext):
         await callback.message.answer("Пост успешно создан!")
 
         await state.clear()
-
-
-

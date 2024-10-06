@@ -119,3 +119,10 @@ async def orm_add_admin(session: AsyncSession, user_id: int):
     await session.execute(query)
     await session.commit()
     await session.close()
+
+
+async def orm_delete_admin(session: AsyncSession, user_id: int):
+    query = update(User).where(User.user_id == user_id).values(is_admin=False)
+    await session.execute(query)
+    await session.commit()
+    await session.close()
