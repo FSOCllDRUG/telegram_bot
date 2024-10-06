@@ -83,8 +83,7 @@ async def orm_add_channel(session: AsyncSession, channel_id: int):
 
 
 async def orm_get_channels_for_admin(session: AsyncSession, admin_user_id: int):
-    query = select(Channel).join(user_channel_association).join(User).where(User.user_id == admin_user_id,
-                                                                            User.is_admin == True)
+    query = select(Channel).join(user_channel_association).where(user_channel_association.c.user_id == admin_user_id)
     result = await session.execute(query)
     await session.close()
     return result.scalars().all()
