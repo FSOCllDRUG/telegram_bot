@@ -126,3 +126,9 @@ async def orm_delete_admin(session: AsyncSession, user_id: int):
     await session.execute(query)
     await session.commit()
     await session.close()
+
+async def orm_get_admins_in_channel(session: AsyncSession, channel_id: int):
+    query = select(User).join(user_channel_association).where(user_channel_association.c.channel_id == channel_id)
+    result = await session.execute(query)
+    await session.close()
+    return result.scalars().all()

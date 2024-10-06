@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from create_bot import bot, env_admins
 from db.pg_orm_query import orm_count_users, orm_get_mailing_list, orm_not_mailing_users_count, \
     orm_add_channel, orm_add_admin_to_channel, orm_get_channels_for_admin, orm_get_user_data, \
-    orm_add_admin, orm_get_admins, orm_delete_admin
+    orm_add_admin, orm_get_admins, orm_delete_admin, orm_get_admins_in_channel
 from db.r_operations import redis_set_mailing_users, redis_set_mailing_msg, redis_set_msg_from, redis_set_mailing_btns, \
     redis_check_channel, redis_check_admin, get_active_users_count
 from filters.chat_type import ChatType
@@ -338,6 +338,41 @@ async def channel_choosen(callback: CallbackQuery):
             }
         )
     )
+
+
+class AddAdminChannel(StatesGroup):
+    channel_id = State()
+    confirm = State()
+
+
+@admin_private_router.callback_query(F.data.startswith("add_admin_to_channel_"))
+async def add_admin_to_channel(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
+    channel_id = int(callback.data.split("_")[-1])
+    await callback.answer("")
+    await state.update_data(channel_id=channel_id)
+    admins = await orm_get_admins(session)
+    channel_admins = await orm_get_admins_in_channel(session, channel_id)
+    channel_admins_ids = [admin.user_id for admin in channel_admins]
+    available_admins = [admin for admin in admins if admin.user_id not in channel_admins_ids]
+    if not available_admins:
+        await callback.message.answer("Нет доступных администраторов для добавления в канал.")
+        return
+    btns = {}
+    for admin in available_admins:
+        btns[f"{admin.name} ({admin.user_id})"] = f"add_admin_{admin.user_id}"
+    await callback.message.answer("Выберите админа, которого вы хотите добавить к выбранному каналу из списка:",
+                                  reply_markup=get_callback_btns(btns=btns, sizes=(1,)))
+    await state.set_state(AddAdminChannel.confirm)
+
+
+@admin_private_router.callback_query(F.data.startswith("add_admin_"), StateFilter(AddAdminChannel.confirm))
+async def confirm_add_admin_to_channel(callback: CallbackQuery, state: FSMContext, session: AsyncSession):
+    admin_id = int(callback.data.split("_")[-1])
+    data = await state.get_data()
+    channel_id = data.get("channel_id")
+    await orm_add_admin_to_channel(session, admin_id, channel_id)
+    await callback.message.answer("Администратор добавлен в канал!")
+    await state.clear()
 
 
 class CreatePost(StatesGroup):
